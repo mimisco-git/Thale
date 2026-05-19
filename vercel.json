@@ -3,12 +3,6 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "crons": [
-    {
-      "path": "/api/cron-agent",
-      "schedule": "* * * * *"
-    }
-  ],
   "rewrites": [
     { "source": "/api/usyc-rate",         "destination": "/api/usyc-rate" },
     { "source": "/api/arc-block",         "destination": "/api/arc-block" },
