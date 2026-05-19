@@ -14,6 +14,7 @@
     { "source": "/api/polymarket-scan",   "destination": "/api/polymarket-scan" },
     { "source": "/api/nfi-oracle",        "destination": "/api/nfi-oracle" },
     { "source": "/api/agent-execute",     "destination": "/api/agent-execute" },
+    { "source": "/api/circle-wallet",     "destination": "/api/circle-wallet" },
     { "source": "/api/cron-agent",        "destination": "/api/cron-agent" },
     { "source": "/api/traction",          "destination": "/api/traction" },
     { "source": "/(.*)",                  "destination": "/index.html" }

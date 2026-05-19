@@ -6,6 +6,8 @@ import { PolymarketScanner } from "./components/PolymarketScanner";
 import { NFIOracle } from "./components/NFIOracle";
 import { AgentLeaderboard } from "./components/AgentLeaderboard";
 import { AgentActivity } from "./components/AgentActivity";
+import { StatsPage } from "./components/StatsPage";
+import { OnboardingModal } from "./components/OnboardingModal";
 import { Toaster } from "sonner";
 import { auth, loginWithGoogle } from "./lib/firebase";
 import { autonomousAgent } from "./services/autonomousAgent";
@@ -14,15 +16,23 @@ import { resetFakeData } from "./services/reputationService";
 export default function App() {
   const [activeTab, setActiveTab] = useState("Terminal");
   const [isLaunched, setIsLaunched] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [user, setUser] = useState(auth.currentUser);
+
+  // Check if /stats route
+  const isStatsPage = window.location.pathname === "/stats";
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
       setUser(u);
       if (u) {
         setIsLaunched(true);
-        // Clean up any fake data from old sessions
         await resetFakeData();
+        // Show onboarding for new users (no traces yet)
+        const hasOnboarded = localStorage.getItem(`thales-onboarded-${u.uid}`);
+        if (!hasOnboarded) {
+          setShowOnboarding(true);
+        }
       }
     });
     return () => unsub();
@@ -38,7 +48,7 @@ export default function App() {
     try {
       await loginWithGoogle();
     } catch {
-      // login dismissed - still launch
+      // dismissed - still launch
     }
     setIsLaunched(true);
   };
@@ -48,6 +58,14 @@ export default function App() {
     await auth.signOut();
     setIsLaunched(false);
     setActiveTab("Terminal");
+    setShowOnboarding(false);
+  };
+
+  const handleOnboardingComplete = () => {
+    if (user) {
+      localStorage.setItem(`thales-onboarded-${user.uid}`, "1");
+    }
+    setShowOnboarding(false);
   };
 
   const renderContent = () => {
@@ -56,13 +74,15 @@ export default function App() {
       case "Signals":     return <SignalsPage />;
       case "Markets":     return <MarketsPage />;
       case "Leaderboard": return <LeaderboardPage />;
+      case "Stats":       return <StatsPage />;
       default:            return <Dashboard />;
     }
   };
 
-  if (!isLaunched) {
-    return <LandingPage onLaunch={handleLaunch} />;
-  }
+  // Public stats page - no auth required
+  if (isStatsPage) return <StatsPage />;
+
+  if (!isLaunched) return <LandingPage onLaunch={handleLaunch} />;
 
   return (
     <Layout activeTab={activeTab} onTabChange={setActiveTab} onSignOut={handleSignOut} user={user}>
@@ -74,6 +94,9 @@ export default function App() {
           style: { background: "transparent", border: "none", boxShadow: "none", padding: 0 },
         }}
       />
+      {showOnboarding && (
+        <OnboardingModal onComplete={handleOnboardingComplete} />
+      )}
       {renderContent()}
     </Layout>
   );
