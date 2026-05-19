@@ -1,0 +1,51 @@
+{
+  "entities": {
+    "Trace": {
+      "title": "Thales Trace",
+      "description": "A record of an agent's reasoning or execution intent",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "string" },
+        "status": { "type": "string" },
+        "agent": { "type": "string" },
+        "context": { "type": "string" },
+        "txHash": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "details": { "type": "object" }
+      },
+      "required": ["id", "type", "amount", "status", "userId", "timestamp"]
+    },
+    "Reputation": {
+      "title": "User Reputation",
+      "description": "Aggregated stats and reputation for a Thales user",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "totalSettled": { "type": "number" },
+        "activeEscrows": { "type": "number" },
+        "todayVolume": { "type": "number" },
+        "reasoningXP": { "type": "number" },
+        "trustScore": { "type": "number" },
+        "citizenTier": { "type": "string" },
+        "availableLiquidity": { "type": "number" },
+        "yieldBearing": { "type": "number" },
+        "lastYield": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "reasoningXP", "trustScore"]
+    }
+  },
+  "firestore": {
+    "/traces/{traceId}": {
+      "schema": "Trace",
+      "description": "Collection of all reasoning traces"
+    },
+    "/reputation/{userId}": {
+      "schema": "Reputation",
+      "description": "Reputation data per user"
+    }
+  }
+}

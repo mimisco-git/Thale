@@ -1,0 +1,34 @@
+{
+  "version": 2,
+  "buildCommand": "vite build",
+  "outputDirectory": "dist",
+  "installCommand": "npm install",
+  "crons": [
+    {
+      "path": "/api/cron-agent",
+      "schedule": "* * * * *"
+    }
+  ],
+  "rewrites": [
+    { "source": "/api/usyc-rate",         "destination": "/api/usyc-rate" },
+    { "source": "/api/arc-block",         "destination": "/api/arc-block" },
+    { "source": "/api/fx-rfq",            "destination": "/api/fx-rfq" },
+    { "source": "/api/health",            "destination": "/api/health" },
+    { "source": "/api/liquidity-balance", "destination": "/api/liquidity-balance" },
+    { "source": "/api/polymarket-scan",   "destination": "/api/polymarket-scan" },
+    { "source": "/api/nfi-oracle",        "destination": "/api/nfi-oracle" },
+    { "source": "/api/agent-execute",     "destination": "/api/agent-execute" },
+    { "source": "/api/cron-agent",        "destination": "/api/cron-agent" },
+    { "source": "/api/traction",          "destination": "/api/traction" },
+    { "source": "/(.*)",                  "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" }
+      ]
+    }
+  ]
+}

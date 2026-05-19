@@ -1,0 +1,6 @@
+{
+  "name": "Thales // The First Thinking Market Participant",
+  "description": "An autonomous economic reasoning agent for the Agora substrate. Optimizes liquidity routing, in-flight yield harvesting, and cross-chain arbitrage via Circle Gateway and USYC.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

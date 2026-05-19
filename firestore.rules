@@ -1,0 +1,78 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && (
+        request.auth.token.email == 'mimisco4life@gmail.com' && isVerified()
+      );
+    }
+
+    // Trace Validation
+    function isValidTrace(data) {
+      return data.keys().hasAll(['id', 'type', 'amount', 'status', 'userId', 'timestamp']) 
+        && data.userId == request.auth.uid
+        && data.id is string && data.id.size() <= 100
+        && data.type is string && data.type.size() <= 50
+        && data.amount is string && data.amount.size() <= 50
+        && data.status is string && data.status.size() <= 20
+        && data.timestamp is timestamp;
+    }
+
+    // Reputation Validation
+    function isValidReputation(data) {
+      return data.keys().hasAll(['userId', 'reasoningXP', 'trustScore'])
+        && data.userId == request.auth.uid
+        && data.reasoningXP is number
+        && data.trustScore is number && data.trustScore <= 999;
+    }
+
+    match /traces/{traceId} {
+      allow get: if isOwner(resource.data.userId);
+      allow list: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() 
+        && isValidId(traceId) 
+        && isValidTrace(request.resource.data)
+        && request.resource.data.timestamp == request.time;
+      allow update, delete: if false; // Traces are immutable records
+    }
+
+    match /reputation/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) 
+        && isValidId(userId)
+        && isValidReputation(request.resource.data)
+        && request.resource.data.reasoningXP >= 0; 
+      allow update: if isOwner(userId)
+        && isValidReputation(request.resource.data)
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.reasoningXP >= resource.data.reasoningXP
+        && (
+          // Action: Update Progress
+          request.resource.data.diff(resource.data).affectedKeys().hasAny(['reasoningXP', 'trustScore', 'totalSettled', 'todayVolume', 'availableLiquidity', 'yieldBearing', 'lastYield', 'updatedAt'])
+          && (request.resource.data.updatedAt == request.time || !request.resource.data.keys().contains('updatedAt'))
+        );
+      allow delete: if false;
+    }
+  }
+}
