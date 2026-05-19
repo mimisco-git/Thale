@@ -1,42 +1,42 @@
-/**
- * /api/reason - Server-side Gemini reasoning endpoint.
- * Keeps GEMINI_API_KEY server-side, never exposed to browser.
- */
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { GoogleGenAI } from "@google/genai";
-import { createPublicClient, http, defineChain, formatUnits } from "viem";
 
-const arcTestnet = defineChain({
-  id: 5042002,
-  name: "Arc Testnet",
-  nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 6 },
-  rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
-  testnet: true,
-});
+const ARC_RPC = "https://rpc.testnet.arc.network";
+const USYC_TELLER = "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A";
 
-const arcClient = createPublicClient({
-  chain: arcTestnet,
-  transport: http("https://rpc.testnet.arc.network", { timeout: 10_000 }),
-});
-
-const TELLER_ABI = [
-  { name: "convertToAssets", type: "function", stateMutability: "view", inputs: [{ name: "shares", type: "uint256" }], outputs: [{ type: "uint256" }] },
-  { name: "totalAssets", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
-  { name: "totalSupply", type: "function", stateMutability: "view", inputs: [], outputs: [{ type: "uint256" }] },
-] as const;
-
-const USYC_TELLER = "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A" as const;
-
-async function getLiveRate() {
+async function getLiveArcState() {
   try {
-    const [assets, supply] = await Promise.all([
-      arcClient.readContract({ address: USYC_TELLER, abi: TELLER_ABI, functionName: "totalAssets" }),
-      arcClient.readContract({ address: USYC_TELLER, abi: TELLER_ABI, functionName: "totalSupply" }),
-    ]);
-    const rate = Number(formatUnits(assets, 6)) / Number(formatUnits(supply, 6));
-    return (rate >= 1.0 && rate <= 1.15) ? { rate, source: "onchain" } : { rate: 1.0024, source: "fallback" };
+    // Get block number
+    const blockRes = await fetch(ARC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_blockNumber", params: [], id: 1 }),
+    });
+    const blockData = await blockRes.json();
+    const block = parseInt(blockData.result, 16);
+
+    // Get USYC rate via eth_call (convertToAssets(1000000))
+    const callRes = await fetch(ARC_RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0", method: "eth_call", id: 2,
+        params: [{
+          to: USYC_TELLER,
+          // convertToAssets(uint256) selector = 0x07a2d13a, arg = 1000000 (0xF4240) padded
+          data: "0x07a2d13a00000000000000000000000000000000000000000000000000000000000f4240",
+        }, "latest"],
+      }),
+    });
+    const callData = await callRes.json();
+    const rawRate = parseInt(callData.result, 16);
+    const rate = rawRate / 1_000_000;
+    const validRate = rate >= 1.0 && rate <= 1.15 ? rate : 1.0024;
+    const apy = ((validRate - 1) * 365 * 100).toFixed(2);
+
+    return { block, rate: validRate, apy, source: rate >= 1.0 && rate <= 1.15 ? "onchain" : "fallback" };
   } catch {
-    return { rate: 1.0024, source: "fallback" };
+    return { block: null, rate: 1.0024, apy: "5.20", source: "fallback" };
   }
 }
 
@@ -44,7 +44,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
-
   if (req.method === "OPTIONS") return res.status(200).end();
   if (req.method !== "POST") return res.status(405).json({ error: "Method not allowed" });
 
@@ -52,65 +51,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!intent) return res.status(400).json({ error: "intent is required" });
 
   const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY not configured" });
+  if (!apiKey) return res.status(500).json({ error: "GEMINI_API_KEY not configured in Vercel" });
 
   try {
-    const [blockNum, rateData] = await Promise.allSettled([
-      arcClient.getBlockNumber(),
-      getLiveRate(),
-    ]);
-
-    const block = blockNum.status === "fulfilled" ? Number(blockNum.value) : null;
-    const { rate, source } = rateData.status === "fulfilled" ? rateData.value : { rate: 1.0024, source: "fallback" };
-    const apy = ((rate - 1) * 365 * 100).toFixed(2);
+    const { block, rate, apy, source } = await getLiveArcState();
 
     const ai = new GoogleGenAI({ apiKey });
 
-    let prompt: string;
-
-    if (mode === "autonomous") {
-      // Autonomous agent decision
-      prompt = `You are Thales, an autonomous economic agent on Arc (Chain ID 5042002).
-Current state: Block #${block}, USYC rate: ${rate} (${source}, APY ~${apy}%), EURC/USDC: 1.0821.
-Available actions: HARVEST_YIELD | REBALANCE_TO_EURC | REBALANCE_TO_USDC | CCTP_BRIDGE | HOLD
-Rules: HARVEST_YIELD if APY > 4%. HOLD if no clear edge. Be conservative.
-Return ONLY JSON:
-{
-  "action": "HARVEST_YIELD or HOLD or REBALANCE_TO_EURC or REBALANCE_TO_USDC or CCTP_BRIDGE",
-  "confidence": 0.0,
-  "reasoning": "one sentence",
-  "naiveRoute": "what happens without Thales",
-  "thalesRoute": "optimized path",
-  "estimatedAlpha": 0.00,
-  "executionPlan": ["step 1", "step 2"],
-  "riskNotes": "key risk"
-}`;
-    } else {
-      // User intent
-      prompt = `You are Thales: the first thinking market participant on Arc (Circle's L1 blockchain).
-LIVE STATE: Block #${block}, USYC rate: ${rate} (${source}), APY ~${apy}%, EURC/USDC: 1.0821.
-CONTRACTS: USDC 0x3600000000000000000000000000000000000000, USYC Teller 0x9fdF14c5B14173D74C08Af27AebFf39240dC105A, FxEscrow 0x867650F5eAe8df91445971f14d89fd84F0C9a9f8, CCTP domain 26.
+    const isAutonomous = mode === "autonomous";
+    const prompt = isAutonomous ? `
+You are Thales, an autonomous economic agent on Arc (Chain ID 5042002).
+State: Block #${block}, USYC rate: ${rate} (${source}, APY ~${apy}%), EURC/USDC: 1.0821.
+Actions: HARVEST_YIELD | REBALANCE_TO_EURC | REBALANCE_TO_USDC | CCTP_BRIDGE | HOLD
+Rules: HARVEST_YIELD if APY > 4%. HOLD if no clear edge.
+Return ONLY JSON: {"action":"HARVEST_YIELD","confidence":0.85,"reasoning":"one sentence","naiveRoute":"idle USDC","thalesRoute":"USYC Teller deposit","estimatedAlpha":12.50,"executionPlan":["Step 1","Step 2"],"riskNotes":"low risk"}` : `
+You are Thales, the first thinking market participant on Arc (Circle L1, Chain ID 5042002).
+LIVE: Block #${block}, USYC rate: ${rate} (${source}, APY ~${apy}%), EURC/USDC: 1.0821.
+CONTRACTS: USDC 0x3600000000000000000000000000000000000000, USYC Teller 0x9fdF14c5B14173D74C08Af27AebFf39240dC105A, FxEscrow 0x867650F5eAe8df91445971f14d89fd84F0C9a9f8.
 USER INTENT: "${intent}"
-Return ONLY valid JSON:
-{
-  "targetCurrency": "USDC or USYC or EURC",
-  "sourceAmount": 0,
-  "destinationChain": "arc",
-  "alphaGenerated": 0.00,
-  "fxAlpha": 0.00,
-  "usycYield": 0.00,
-  "reasoningTrace": {
-    "strategy": "brief strategy",
-    "naiveRoute": "unoptimized path",
-    "thalesRoute": "optimized path with contract addresses",
-    "yieldHarvesting": "USYC Teller interaction",
-    "fxStrategy": "EURC/USDC optimization",
-    "finalityEstimate": "sub-second on Arc",
-    "telemetry": ["Step 1", "Step 2", "Step 3"],
-    "contractsUsed": ["0x...", "0x..."]
-  }
-}`;
-    }
+Return ONLY JSON: {"targetCurrency":"USYC","sourceAmount":1000,"destinationChain":"arc","alphaGenerated":5.20,"fxAlpha":0,"usycYield":5.20,"reasoningTrace":{"strategy":"brief","naiveRoute":"idle","thalesRoute":"optimized with contracts","yieldHarvesting":"Teller deposit","fxStrategy":"peg monitor","finalityEstimate":"sub-second","telemetry":["Step 1","Step 2","Step 3"],"contractsUsed":["0x9fdF..."]}}`;
 
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
@@ -121,16 +80,9 @@ Return ONLY valid JSON:
     const text = (response.text || "{}").replace(/```json|```/g, "").trim();
     const result = JSON.parse(text);
 
-    return res.json({
-      ...result,
-      arcBlock: block,
-      usycRate: rate,
-      usycRateSource: source,
-      usycAPY: parseFloat(apy),
-      timestamp: new Date().toISOString(),
-    });
+    return res.json({ ...result, arcBlock: block, usycRate: rate, usycRateSource: source, usycAPY: parseFloat(apy), timestamp: new Date().toISOString() });
   } catch (err: any) {
-    console.error("[/api/reason]", err);
+    console.error("[/api/reason]", err.message);
     return res.status(500).json({ error: err.message });
   }
 }

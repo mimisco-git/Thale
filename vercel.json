@@ -9,14 +9,11 @@
     { "source": "/api/usyc-rate",         "destination": "/api/usyc-rate" },
     { "source": "/api/arc-block",         "destination": "/api/arc-block" },
     { "source": "/api/fx-rfq",            "destination": "/api/fx-rfq" },
-    { "source": "/api/health",            "destination": "/api/health" },
     { "source": "/api/liquidity-balance", "destination": "/api/liquidity-balance" },
     { "source": "/api/polymarket-scan",   "destination": "/api/polymarket-scan" },
     { "source": "/api/nfi-oracle",        "destination": "/api/nfi-oracle" },
     { "source": "/api/agent-execute",     "destination": "/api/agent-execute" },
     { "source": "/api/circle-wallet",     "destination": "/api/circle-wallet" },
-    { "source": "/api/cron-agent",        "destination": "/api/cron-agent" },
-    { "source": "/api/traction",          "destination": "/api/traction" },
     { "source": "/(.*)",                  "destination": "/index.html" }
   ],
   "headers": [

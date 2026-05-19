@@ -1,30 +1,20 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createPublicClient, http, defineChain } from "viem";
 
-const arcTestnet = defineChain({
-  id: 5042002,
-  name: "Arc Testnet",
-  nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 6 },
-  rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
-  testnet: true,
-});
-
-const client = createPublicClient({
-  chain: arcTestnet,
-  transport: http("https://rpc.testnet.arc.network", { timeout: 10_000 }),
-});
+const ARC_RPC = "https://rpc.testnet.arc.network";
 
 export default async function handler(_req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   try {
-    const blockNum = await client.getBlockNumber();
-    const block = await client.getBlock({ blockNumber: blockNum });
+    const r = await fetch(ARC_RPC, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", method: "eth_getBlockByNumber", params: ["latest", false], id: 1 }) });
+    const data = await r.json();
+    const block = data.result;
     return res.json({
-      number: Number(block.number),
+      number: parseInt(block.number, 16),
       hash: block.hash,
-      timestamp: Number(block.timestamp),
-      txCount: block.transactions.length,
-      explorerUrl: `https://testnet.arcscan.app/block/${Number(block.number)}`,
+      timestamp: parseInt(block.timestamp, 16),
+      txCount: block.transactions?.length || 0,
+      explorerUrl: `https://testnet.arcscan.app/block/${parseInt(block.number, 16)}`,
     });
   } catch (err: any) {
     return res.status(500).json({ error: err.message });

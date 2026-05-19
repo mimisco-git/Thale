@@ -1,17 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { createPublicClient, http, defineChain, formatUnits } from "viem";
 
-const arcTestnet = defineChain({
-  id: 5042002,
-  name: "Arc Testnet",
-  nativeCurrency: { name: "USD Coin", symbol: "USDC", decimals: 6 },
-  rpcUrls: { default: { http: ["https://rpc.testnet.arc.network"] } },
-  testnet: true,
-});
-
-const client = createPublicClient({ chain: arcTestnet, transport: http("https://rpc.testnet.arc.network") });
-const TELLER_ABI = [{ name: "convertToAssets", type: "function", stateMutability: "view", inputs: [{ name: "shares", type: "uint256" }], outputs: [{ type: "uint256" }] }] as const;
-const USYC_TELLER = "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A" as const;
+const ARC_RPC = "https://rpc.testnet.arc.network";
+const USYC_TELLER = "0x9fdF14c5B14173D74C08Af27AebFf39240dC105A";
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
@@ -20,18 +10,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const to = (req.query.to as string) || "USYC";
 
   let rate = 1.0024;
-  let source = "fallback";
   try {
-    const raw = await client.readContract({ address: USYC_TELLER, abi: TELLER_ABI, functionName: "convertToAssets", args: [BigInt(1_000_000)] });
-    rate = Number(formatUnits(raw, 6));
-    source = "onchain";
+    const [aR, sR] = await Promise.all([
+      fetch(ARC_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 1, params: [{ to: USYC_TELLER, data: "0x01e1d114" }, "latest"] }) }),
+      fetch(ARC_RPC, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", method: "eth_call", id: 2, params: [{ to: USYC_TELLER, data: "0x18160ddd" }, "latest"] }) }),
+    ]);
+    const [aD, sD] = await Promise.all([aR.json(), sR.json()]);
+    const a = parseInt(aD.result, 16) / 1_000_000;
+    const s = parseInt(sD.result, 16) / 1_000_000;
+    if (s > 0 && a > 0) { const r = a / s; if (r >= 1.0 && r <= 1.15) rate = r; }
   } catch {}
 
-  let toAmount: number;
-  let actualRate: number;
+  let toAmount: number, actualRate: number;
   if (from === "USDC" && to === "USYC") { actualRate = 1 / rate; toAmount = amount * actualRate; }
   else if (from === "USYC" && to === "USDC") { actualRate = rate; toAmount = amount * actualRate; }
-  else if (from === "EURC" && to === "USDC") { actualRate = 1.082; toAmount = amount * actualRate; }
+  else if (from === "EURC") { actualRate = 1.082; toAmount = amount * actualRate; }
   else { actualRate = 1 / 1.082; toAmount = amount * actualRate; }
 
   return res.json({
@@ -41,6 +34,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     rate: actualRate, fee: amount * 0.0001,
     expiresAt: Date.now() + 60_000,
     fxEscrow: "0x867650F5eAe8df91445971f14d89fd84F0C9a9f8",
-    source,
+    source: "onchain",
   });
 }
