@@ -5,6 +5,7 @@
   "installCommand": "npm install",
   "rewrites": [
     { "source": "/api/reason",            "destination": "/api/reason" },
+    { "source": "/api/test-gemini",       "destination": "/api/test-gemini" },
     { "source": "/api/usyc-rate",         "destination": "/api/usyc-rate" },
     { "source": "/api/arc-block",         "destination": "/api/arc-block" },
     { "source": "/api/fx-rfq",            "destination": "/api/fx-rfq" },
