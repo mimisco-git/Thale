@@ -4,6 +4,7 @@
   "outputDirectory": "dist",
   "installCommand": "npm install",
   "rewrites": [
+    { "source": "/api/reason",            "destination": "/api/reason" },
     { "source": "/api/usyc-rate",         "destination": "/api/usyc-rate" },
     { "source": "/api/arc-block",         "destination": "/api/arc-block" },
     { "source": "/api/fx-rfq",            "destination": "/api/fx-rfq" },
@@ -21,7 +22,8 @@
       "source": "/api/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" }
+        { "key": "Access-Control-Allow-Methods", "value": "GET,POST,OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
   ]
