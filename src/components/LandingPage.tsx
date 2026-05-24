@@ -166,10 +166,19 @@ export function LandingPage({ onLaunch }: LandingPageProps) {
         <p className="text-[9px] lg:text-[10px] font-black uppercase tracking-[0.2em] lg:tracking-[0.5em] opacity-30 text-center order-3 lg:order-2">
           © 2026 THALES ECONOMIC REASONING // PHYSICS-BY-ARC
         </p>
-        <div className="flex gap-6 lg:gap-8 opacity-50 order-2 lg:order-3">
-          <span className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest cursor-pointer hover:text-white transition-colors">Twitter</span>
-          <span className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest cursor-pointer hover:text-white transition-colors">GitHub</span>
-          <span className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest cursor-pointer hover:text-white transition-colors">Docs</span>
+        <div className="flex gap-6 lg:gap-8 order-2 lg:order-3">
+          <a href="https://x.com/sir_mimisco" target="_blank" rel="noopener noreferrer"
+            className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white transition-colors">
+            Twitter
+          </a>
+          <a href="https://github.com/mimisco-git/Thale" target="_blank" rel="noopener noreferrer"
+            className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white transition-colors">
+            GitHub
+          </a>
+          <a href="/docs"
+            className="text-[9px] lg:text-[10px] font-black uppercase tracking-widest text-white/50 hover:text-white transition-colors">
+            Docs
+          </a>
         </div>
       </footer>
     </div>

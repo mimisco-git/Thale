@@ -7,6 +7,7 @@ import { NFIOracle } from "./components/NFIOracle";
 import { AgentLeaderboard } from "./components/AgentLeaderboard";
 import { AgentActivity } from "./components/AgentActivity";
 import { StatsPage } from "./components/StatsPage";
+import { DocsPage } from "./components/DocsPage";
 import { OnboardingModal } from "./components/OnboardingModal";
 import { Toaster } from "sonner";
 import { auth, loginWithGoogle } from "./lib/firebase";
@@ -21,6 +22,7 @@ export default function App() {
 
   // Check if /stats route
   const isStatsPage = window.location.pathname === "/stats";
+  const isDocsPage = window.location.pathname === "/docs";
 
   useEffect(() => {
     const unsub = auth.onAuthStateChanged(async (u) => {
@@ -81,6 +83,7 @@ export default function App() {
 
   // Public stats page - no auth required
   if (isStatsPage) return <StatsPage />;
+  if (isDocsPage) return <DocsPage />;
 
   if (!isLaunched) return <LandingPage onLaunch={handleLaunch} />;
 
